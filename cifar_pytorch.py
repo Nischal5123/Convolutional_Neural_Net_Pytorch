@@ -206,7 +206,9 @@ def main():
             "[Epoch {:3}]   Loss:  {:8.4}     Train Acc:  {:8.4}%      Val Acc:  {:8.4}%".format(i, train_running_loss,
                                                                                                  train_running_acc * 100,
                                                                                                  val_acc * 100))
-
+    #save model
+    print("##################################################### Saving Model ##############################################################")
+    torch.save(model.state_dict(), 'training.pth')
     # Plot training and validation curves
     fig, ax1 = plt.subplots(figsize=(16, 9))
     color = 'tab:red'
