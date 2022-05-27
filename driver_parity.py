@@ -59,9 +59,10 @@ class ParityLSTM(torch.nn.Module):
 
     def __init__(self, hidden_dim=64):
         super().__init__()
-        self.hidden_dim = hidden_dim
-        self.LSTM = nn.LSTM(1,hidden_size=self.hidden_dim)
-        self.linear = nn.Linear(self.hidden_dim, 1)
+        #self.hidden_dim = hidden_dim
+        self.hidden_dim= hidden_dim
+        self.LSTM = nn.LSTM(1,hidden_size=self.hidden_dim, num_layers=1,batch_first=True)
+        self.linear = nn.Linear(self.hidden_dim, 2)
 
     # forward runs the model on an B x max_length x 1 tensor and outputs a B x 2 tensor representing a score for
     # even/odd parity for each element of the batch
@@ -76,7 +77,11 @@ class ParityLSTM(torch.nn.Module):
     #   out -- a batch_size x 2 tensor of scores for even/odd parity    
 
     def forward(self, x, s):
-        out = self.LSTM(x,s)
+        si = torch.tensor(s) - 1  # zero indexing
+        rs = torch.arange(0, x.shape[0])  # to index the batch dim
+        x= x.unsqueeze(2) #batch_size x max_length x 1 binary tensor
+        out, hidden = self.LSTM(x)
+        out = out[rs, si, :]  #formatting to send to Linear layer
         out = self.linear(out)
         return out
 
@@ -102,7 +107,7 @@ def runParityExperiment(model, max_train_length):
         val_loader = DataLoader(val, batch_size=1000, shuffle=False, collate_fn=pad_collate)
         val_loss, val_acc = validation_metrics(model, val_loader)
         lengths.append(k)
-        accuracy.append(val_acc)
+        accuracy.append(val_acc.cpu())
 
         logging.info("length=%d val accuracy %.3f" % (k, val_acc))
         k += 1
@@ -111,6 +116,7 @@ def runParityExperiment(model, max_train_length):
     plt.axvline(x=max_train_length, c="k", linestyle="dashed")
     plt.xlabel("Binary String Length")
     plt.ylabel("Accuracy")
+    plt.show()
     plt.savefig(str(model) + '_parity_generalization.png')
 
 
@@ -143,8 +149,8 @@ def pad_collate(batch):
     x_lens = [len(x) for x in xx]
 
     xx_pad = pad_sequence(xx, batch_first=True, padding_value=0)
-    yy = torch.LongTensor(yy)
-
+    #yy = torch.LongTensor(yy)
+    yy = torch.tensor(yy).long()
     return xx_pad, yy, x_lens
 
 
@@ -209,12 +215,13 @@ def validation_metrics(model, loader):
         y_hat = model(x, l)
 
         loss = crit(y_hat, y)
-        pred = torch.max(y_hat, 1)[1]
+        pred = (torch.max(y_hat, 1)[1])
         correct += (pred == y).float().sum()
         total += y.shape[0]
         sum_loss += loss.item() * y.shape[0]
 
-    return sum_loss / total, correct / total
+
+    return (sum_loss / total), (correct / total)
 
 
 main()
